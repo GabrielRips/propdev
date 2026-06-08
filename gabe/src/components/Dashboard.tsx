@@ -58,6 +58,24 @@ export default function Dashboard() {
     { label: 'Total dwellings', value: totalUnits.toLocaleString('en-AU') },
   ];
 
+  if (visibleProjects.length === 0) {
+    return (
+      <AppShell
+        title={`Welcome${user ? `, ${user.name.split(/\s|\(/)[0]}` : ''}`}
+        subtitle="Your property development portfolio"
+      >
+        <div className="surface p-12 sm:p-16 text-center">
+          <div className="text-4xl mb-3">🏗️</div>
+          <h3 className="text-lg font-semibold text-gray-900">No projects yet</h3>
+          <p className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto">
+            This is a clean slate. Once a project is added it appears here with its
+            phases, feasibility, financials, construction and sales.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       title={`Welcome back, ${user?.name.split(/\s|\(/)[0] ?? ''}`}

@@ -239,7 +239,7 @@ export default function Planner() {
   const { user } = useAuth();
   const visibleProjects = projects.filter((p) => canAccessProject(user, p.id));
   const [activeProjectId, setActiveProjectId] = useState(
-    visibleProjects[0]?.id ?? projects[0].id
+    visibleProjects[0]?.id ?? ''
   );
 
   const activeProject = visibleProjects.find((p) => p.id === activeProjectId);

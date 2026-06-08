@@ -19,9 +19,9 @@ test('requires authentication before rendering the app', () => {
   expect(screen.queryByText('Riverside Townhouses')).not.toBeInTheDocument();
 });
 
-test('shows the GABE brand on the login screen', () => {
+test('shows the PropDev brand on the login screen', () => {
   render(<App />);
-  expect(screen.getAllByText('GABE').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('PropDev').length).toBeGreaterThan(0);
   expect(screen.getByText('Property Development OS')).toBeInTheDocument();
 });
 

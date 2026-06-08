@@ -26,8 +26,8 @@ export default function AppShell({ title, subtitle, children, wide }: AppShellPr
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <Link to="/" className="flex items-center gap-2.5">
-              <img src={logo} alt="GABE" className="w-8 h-8 rounded-lg object-cover" />
-              <span className="text-xl font-bold text-gray-900">GABE</span>
+              <img src={logo} alt="PropDev" className="w-8 h-8 rounded-lg object-cover" />
+              <span className="text-xl font-bold text-gray-900">PropDev</span>
             </Link>
             <span className="hidden md:inline text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded uppercase tracking-wide">
               Property Dev OS

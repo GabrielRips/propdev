@@ -29,9 +29,9 @@ function LoginScreen() {
     <main className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center px-4">
       <section className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl shadow-xl p-7">
         <div className="flex items-center gap-3 mb-1">
-          <img src={logo} alt="GABE" className="w-10 h-10 rounded-lg object-cover" />
+          <img src={logo} alt="PropDev" className="w-10 h-10 rounded-lg object-cover" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 leading-none">GABE</h1>
+            <h1 className="text-2xl font-bold text-gray-900 leading-none">PropDev</h1>
             <p className="text-[11px] text-teal-700 font-semibold uppercase tracking-wide mt-1">
               Property Development OS
             </p>

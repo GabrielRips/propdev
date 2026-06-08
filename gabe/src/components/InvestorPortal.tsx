@@ -326,7 +326,7 @@ export default function InvestorPortal() {
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <p className="text-sm text-gray-600">
           <span className="font-semibold text-gray-900">One-click reporting.</span>{' '}
-          Packs auto-assemble from your GABE modules — Feasibility, Sales,
+          Packs auto-assemble from your PropDev modules — Feasibility, Sales,
           Construction and Financial Control — so lender drawdowns, investor updates
           and JV reports are generated in a single click. Use{' '}
           <span className="font-medium text-emerald-700">controlled visibility</span>{' '}

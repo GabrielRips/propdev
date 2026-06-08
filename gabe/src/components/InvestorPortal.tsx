@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AppShell from './AppShell';
+import { useCollection } from '../data/useCollection';
 import {
-  packs as PACKS,
-  capitalRequests,
   Pack,
+  PackSection,
   PackType,
+  PackStatus,
   CapitalRequest,
 } from '../data/investor-data';
 import { getProjects } from '../data/projectStore';
+
+const PACKS_KEY = 'propdev:__portfolio__:packs';
+const CAPITAL_KEY = 'propdev:__portfolio__:capital';
+
+const today = new Date().toISOString().slice(0, 10);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function formatAUD(amount: number): string {
@@ -33,12 +39,22 @@ function formatDate(dateStr: string): string {
   });
 }
 
-// Fixed "recent" timestamps so regenerate/share are deterministic in the prototype.
-const REGEN_DATE = '2026-06-06';
-const SHARE_DATE = '2026-06-07';
-
 function projectName(projectId: string): string {
+  if (!projectId) return 'No project';
   return getProjects().find((p) => p.id === projectId)?.name ?? 'Unknown project';
+}
+
+// Default section list seeded onto every new pack.
+function defaultSections(): PackSection[] {
+  return [
+    { label: 'Project summary & status', included: true, source: 'Dashboard' },
+    { label: 'Feasibility & margin', included: true, source: 'Feasibility Engine' },
+    { label: 'Pre-sales register', included: true, source: 'Sales' },
+    { label: 'Live budget vs feasibility', included: true, source: 'Financial Control Centre' },
+    { label: 'Construction progress & photos', included: true, source: 'Construction Hub' },
+    { label: 'Planning & permits', included: true, source: 'Permits' },
+    { label: 'Cashflow forecast', included: true, source: 'Feasibility Engine' },
+  ];
 }
 
 // ── Static config ────────────────────────────────────────────────────────
@@ -49,13 +65,17 @@ const PACK_FILTERS: Array<'All' | PackType> = [
   'JV Report',
 ];
 
+const PACK_TYPES: PackType[] = ['Lender Pack', 'Investor Pack', 'JV Report'];
+
 const PACK_TYPE_BADGE: Record<PackType, string> = {
   'Lender Pack': 'bg-blue-50 text-blue-700 border-blue-200',
   'Investor Pack': 'bg-purple-50 text-purple-700 border-purple-200',
   'JV Report': 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
-const PACK_STATUS_PILL: Record<Pack['status'], string> = {
+const PACK_STATUSES: PackStatus[] = ['draft', 'ready', 'shared'];
+
+const PACK_STATUS_PILL: Record<PackStatus, string> = {
   draft: 'bg-gray-100 text-gray-600',
   ready: 'bg-blue-50 text-blue-700',
   shared: 'bg-emerald-50 text-emerald-700',
@@ -88,6 +108,17 @@ const CAP_STATUS_BAR: Record<CapitalRequest['status'], string> = {
   term_sheet: 'bg-blue-500',
   committed: 'bg-emerald-500',
 };
+
+// ── Escape-to-close hook ─────────────────────────────────────────────────
+function useEscapeClose(onClose: () => void) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+}
 
 // ── Toggle switch ────────────────────────────────────────────────────────
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -128,6 +159,305 @@ function Kpi({
   );
 }
 
+// Shared input styling
+const inputClass =
+  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+const labelClass = 'block text-xs font-medium text-gray-500 mb-1.5';
+
+// ── New pack modal ───────────────────────────────────────────────────────
+function NewPackModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (input: Omit<Pack, 'id'>) => void;
+}) {
+  useEscapeClose(onClose);
+  const projects = getProjects();
+
+  const [type, setType] = useState<PackType>('Lender Pack');
+  const [title, setTitle] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [recipientOrg, setRecipientOrg] = useState('');
+  const [projectId, setProjectId] = useState('');
+
+  const canSave = title.trim().length > 0;
+
+  function save() {
+    if (!canSave) return;
+    onCreate({
+      type,
+      title: title.trim(),
+      projectId,
+      recipient: recipient.trim(),
+      recipientOrg: recipientOrg.trim(),
+      status: 'draft',
+      sections: defaultSections(),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">New reporting pack</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="px-6 py-5 overflow-y-auto space-y-4">
+          <div>
+            <label className={labelClass}>Pack type</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as PackType)}
+              className={inputClass}
+            >
+              {PACK_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Title *</label>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Q2 drawdown pack"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Recipient</label>
+              <input
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="Contact name"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Recipient org</label>
+              <input
+                value={recipientOrg}
+                onChange={(e) => setRecipientOrg(e.target.value)}
+                placeholder="Organisation"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Project</label>
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">No project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <p className="text-[11px] text-gray-400">
+            The pack is seeded with the standard 7 sections. Use Configure to scope which
+            sections the recipient can see.
+          </p>
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={!canSave}
+            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Create pack
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── New capital request modal ────────────────────────────────────────────
+function NewCapitalModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (input: Omit<CapitalRequest, 'id'>) => void;
+}) {
+  useEscapeClose(onClose);
+  const projects = getProjects();
+
+  const [purpose, setPurpose] = useState('');
+  const [amount, setAmount] = useState('');
+  const [party, setParty] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [status, setStatus] = useState<CapitalRequest['status']>('identified');
+  const [note, setNote] = useState('');
+
+  const canSave = purpose.trim().length > 0;
+  const parsedAmount = Number(amount.replace(/[^0-9.]/g, '')) || 0;
+
+  function save() {
+    if (!canSave) return;
+    onCreate({
+      projectId,
+      purpose: purpose.trim(),
+      amount: parsedAmount,
+      party: party.trim(),
+      status,
+      note: note.trim() || undefined,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">New capital request</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="px-6 py-5 overflow-y-auto space-y-4">
+          <div>
+            <label className={labelClass}>Purpose *</label>
+            <input
+              autoFocus
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              placeholder="e.g. Senior debt — construction facility"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Amount (AUD)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                  $
+                </span>
+                <input
+                  inputMode="numeric"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  className={`${inputClass} pl-7`}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Party</label>
+              <input
+                value={party}
+                onChange={(e) => setParty(e.target.value)}
+                placeholder="Lender / investor"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>Project</label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">No project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as CapitalRequest['status'])}
+                className={inputClass}
+              >
+                {CAP_STATUS_ORDER.map((s) => (
+                  <option key={s} value={s}>
+                    {CAP_STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Note</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Optional context"
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={!canSave}
+            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Add request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Configure modal ──────────────────────────────────────────────────────
 function ConfigureModal({
   pack,
@@ -140,13 +470,7 @@ function ConfigureModal({
   onToggleSection: (index: number) => void;
   onGenerate: () => void;
 }) {
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  useEscapeClose(onClose);
 
   const includedCount = pack.sections.filter((s) => s.included).length;
 
@@ -172,7 +496,7 @@ function ConfigureModal({
                 {pack.title}
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                {pack.recipient} · {pack.recipientOrg}
+                {pack.recipient || '—'} · {pack.recipientOrg || '—'}
               </p>
             </div>
             <button
@@ -185,7 +509,7 @@ function ConfigureModal({
           </div>
           <p className="text-xs text-gray-400 mt-3">
             Controlled visibility — only the sections toggled on are shared with{' '}
-            <span className="font-medium text-gray-600">{pack.recipientOrg}</span>.
+            <span className="font-medium text-gray-600">{pack.recipientOrg || 'the recipient'}</span>.
             Unchecked sections are hidden from the recipient.
           </p>
         </div>
@@ -234,86 +558,70 @@ function ConfigureModal({
 
 // ── Main page ────────────────────────────────────────────────────────────
 export default function InvestorPortal() {
-  const [packList, setPackList] = useState<Pack[]>(PACKS);
+  const packs = useCollection<Pack>(PACKS_KEY);
+  const capital = useCollection<CapitalRequest>(CAPITAL_KEY);
+
   const [filter, setFilter] = useState<'All' | PackType>('All');
   const [configuringId, setConfiguringId] = useState<string | null>(null);
+  const [showNewPack, setShowNewPack] = useState(false);
+  const [showNewCapital, setShowNewCapital] = useState(false);
 
-  const configuringPack = packList.find((p) => p.id === configuringId) ?? null;
+  const configuringPack = packs.items.find((p) => p.id === configuringId) ?? null;
 
   // KPIs
   const kpis = useMemo(() => {
-    const shared = packList.filter((p) => p.status === 'shared').length;
-    const sought = capitalRequests
+    const shared = packs.items.filter((p) => p.status === 'shared').length;
+    const sought = capital.items
       .filter((c) => c.status !== 'committed')
       .reduce((sum, c) => sum + c.amount, 0);
-    const committed = capitalRequests
+    const committed = capital.items
       .filter((c) => c.status === 'committed')
       .reduce((sum, c) => sum + c.amount, 0);
-    return { totalPacks: packList.length, shared, sought, committed };
-  }, [packList]);
+    return { totalPacks: packs.items.length, shared, sought, committed };
+  }, [packs.items, capital.items]);
 
   // Capital pipeline sorted by stage
   const sortedRequests = useMemo(
     () =>
-      [...capitalRequests].sort(
+      [...capital.items].sort(
         (a, b) =>
           CAP_STATUS_ORDER.indexOf(a.status) - CAP_STATUS_ORDER.indexOf(b.status)
       ),
-    []
+    [capital.items]
   );
 
   const stageTotals = useMemo(() => {
     const totals = CAP_STATUS_ORDER.map((status) => ({
       status,
-      amount: capitalRequests
+      amount: capital.items
         .filter((c) => c.status === status)
         .reduce((sum, c) => sum + c.amount, 0),
     }));
     const grand = totals.reduce((sum, t) => sum + t.amount, 0) || 1;
     return { totals, grand };
-  }, []);
+  }, [capital.items]);
 
   const visiblePacks =
-    filter === 'All' ? packList : packList.filter((p) => p.type === filter);
+    filter === 'All' ? packs.items : packs.items.filter((p) => p.type === filter);
 
   // Actions
   function regenerate(id: string) {
-    setPackList((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, status: 'ready', lastGenerated: REGEN_DATE } : p
-      )
-    );
+    packs.update(id, { status: 'ready', lastGenerated: today });
   }
 
   function share(id: string) {
-    setPackList((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, status: 'shared', sharedDate: SHARE_DATE } : p
-      )
-    );
+    packs.update(id, { status: 'shared', sharedDate: today });
   }
 
-  function toggleSection(packId: string, index: number) {
-    setPackList((prev) =>
-      prev.map((p) =>
-        p.id === packId
-          ? {
-              ...p,
-              sections: p.sections.map((s, i) =>
-                i === index ? { ...s, included: !s.included } : s
-              ),
-            }
-          : p
-      )
+  function toggleSection(pack: Pack, index: number) {
+    const sections = pack.sections.map((s, i) =>
+      i === index ? { ...s, included: !s.included } : s
     );
+    packs.update(pack.id, { sections });
   }
 
   function generateFromModal(id: string) {
-    setPackList((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, status: 'ready', lastGenerated: REGEN_DATE } : p
-      )
-    );
+    packs.update(id, { status: 'ready', lastGenerated: today });
     setConfiguringId(null);
   }
 
@@ -338,7 +646,7 @@ export default function InvestorPortal() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Kpi label="Total packs" value={String(kpis.totalPacks)} />
         <Kpi label="Shared" value={String(kpis.shared)} accent="text-emerald-600" />
-        <Kpi label="Capital requests" value={String(capitalRequests.length)} />
+        <Kpi label="Capital requests" value={String(capital.items.length)} />
         <Kpi
           label="Capital sought"
           value={formatAUDShort(kpis.sought)}
@@ -353,39 +661,49 @@ export default function InvestorPortal() {
 
       {/* Capital pipeline */}
       <section className="mb-8">
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Capital-raising pipeline</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-bold text-gray-900">Capital-raising pipeline</h2>
+          <button
+            onClick={() => setShowNewCapital(true)}
+            className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            + New capital request
+          </button>
+        </div>
         <p className="text-sm text-gray-500 mb-4">
           Live view of debt and equity across stages.
         </p>
 
-        {/* stacked summary bar */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-          <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-100">
-            {stageTotals.totals.map((t) =>
-              t.amount > 0 ? (
-                <div
-                  key={t.status}
-                  className={CAP_STATUS_BAR[t.status]}
-                  style={{ width: `${(t.amount / stageTotals.grand) * 100}%` }}
-                  title={`${CAP_STATUS_LABEL[t.status]} — ${formatAUD(t.amount)}`}
-                />
-              ) : null
-            )}
+        {capital.items.length > 0 && (
+          /* stacked summary bar */
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-100">
+              {stageTotals.totals.map((t) =>
+                t.amount > 0 ? (
+                  <div
+                    key={t.status}
+                    className={CAP_STATUS_BAR[t.status]}
+                    style={{ width: `${(t.amount / stageTotals.grand) * 100}%` }}
+                    title={`${CAP_STATUS_LABEL[t.status]} — ${formatAUD(t.amount)}`}
+                  />
+                ) : null
+              )}
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3">
+              {stageTotals.totals.map((t) => (
+                <div key={t.status} className="flex items-center gap-1.5 text-xs">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${CAP_STATUS_BAR[t.status]}`}
+                  />
+                  <span className="text-gray-500">{CAP_STATUS_LABEL[t.status]}</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatAUDShort(t.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3">
-            {stageTotals.totals.map((t) => (
-              <div key={t.status} className="flex items-center gap-1.5 text-xs">
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${CAP_STATUS_BAR[t.status]}`}
-                />
-                <span className="text-gray-500">{CAP_STATUS_LABEL[t.status]}</span>
-                <span className="font-semibold text-gray-900">
-                  {formatAUDShort(t.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         <div className="space-y-2">
           {sortedRequests.map((req) => (
@@ -403,26 +721,47 @@ export default function InvestorPortal() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {projectName(req.projectId)} · {req.party}
+                  {projectName(req.projectId)}
+                  {req.party ? ` · ${req.party}` : ''}
                 </p>
                 {req.note && (
                   <p className="text-xs text-gray-400 mt-1.5">{req.note}</p>
                 )}
               </div>
-              <div className="text-right flex-shrink-0">
+              <div className="text-right flex-shrink-0 flex items-start gap-3">
                 <p className="text-base font-bold text-gray-900">
                   {formatAUDShort(req.amount)}
                 </p>
+                <button
+                  onClick={() => capital.remove(req.id)}
+                  className="text-gray-300 hover:text-red-500 text-sm leading-none mt-1"
+                  title="Delete request"
+                  aria-label="Delete request"
+                >
+                  ×
+                </button>
               </div>
             </div>
           ))}
         </div>
+
+        {capital.items.length === 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <p className="text-gray-400 text-sm">No capital requests yet.</p>
+          </div>
+        )}
       </section>
 
       {/* Packs */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">Reporting packs</h2>
+          <button
+            onClick={() => setShowNewPack(true)}
+            className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            + New pack
+          </button>
         </div>
 
         {/* filter pills */}
@@ -471,13 +810,22 @@ export default function InvestorPortal() {
                       {projectName(pack.projectId)}
                     </p>
                   </div>
+                  <button
+                    onClick={() => packs.remove(pack.id)}
+                    className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0"
+                    title="Delete pack"
+                    aria-label="Delete pack"
+                  >
+                    ×
+                  </button>
                 </div>
 
                 <div className="mt-3 text-xs text-gray-500 space-y-0.5">
                   <p>
-                    <span className="text-gray-400">Recipient:</span> {pack.recipient}
+                    <span className="text-gray-400">Recipient:</span>{' '}
+                    {pack.recipient || '—'}
                     {' · '}
-                    {pack.recipientOrg}
+                    {pack.recipientOrg || '—'}
                   </p>
                   <p>
                     <span className="text-gray-400">Visibility:</span>{' '}
@@ -522,19 +870,43 @@ export default function InvestorPortal() {
           })}
         </div>
 
-        {visiblePacks.length === 0 && (
+        {packs.items.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <p className="text-gray-400 text-sm">No packs yet — create one.</p>
+          </div>
+        ) : visiblePacks.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <p className="text-gray-400 text-sm">No packs of this type.</p>
           </div>
-        )}
+        ) : null}
       </section>
 
       {configuringPack && (
         <ConfigureModal
           pack={configuringPack}
           onClose={() => setConfiguringId(null)}
-          onToggleSection={(index) => toggleSection(configuringPack.id, index)}
+          onToggleSection={(index) => toggleSection(configuringPack, index)}
           onGenerate={() => generateFromModal(configuringPack.id)}
+        />
+      )}
+
+      {showNewPack && (
+        <NewPackModal
+          onClose={() => setShowNewPack(false)}
+          onCreate={(input) => {
+            packs.add(input);
+            setShowNewPack(false);
+          }}
+        />
+      )}
+
+      {showNewCapital && (
+        <NewCapitalModal
+          onClose={() => setShowNewCapital(false)}
+          onCreate={(input) => {
+            capital.add(input);
+            setShowNewCapital(false);
+          }}
         />
       )}
     </AppShell>

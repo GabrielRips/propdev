@@ -11,6 +11,9 @@ export interface HasId {
 const cache: Record<string, HasId[]> = {};
 const loaded: Record<string, boolean> = {};
 const listeners: Record<string, Set<() => void>> = {};
+// Stable reference returned before a key is loaded — required so
+// useSyncExternalStore's getSnapshot is cached (else it loops).
+const EMPTY: HasId[] = [];
 
 function parseKey(key: string): { projectId: string; name: string } | null {
   const parts = key.split(':'); // ['propdev', projectId, name...]
@@ -25,7 +28,7 @@ function endpoint(key: string): string | null {
 }
 
 function snapshot<T extends HasId>(key: string): T[] {
-  return (cache[key] ?? []) as T[];
+  return (cache[key] ?? EMPTY) as T[];
 }
 
 function emit(key: string) {

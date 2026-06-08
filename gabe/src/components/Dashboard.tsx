@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { projects, ProjectPhase, Project } from '../data/projects';
+import { ProjectPhase, Project } from '../data/projects';
+import { useProjects } from '../data/projectStore';
 import { projectCommandData, ProjectHealthStatus } from '../data/project-insights';
 import ProjectCard from './ProjectCard';
 import AppShell from './AppShell';
+import CreateProjectModal from './CreateProjectModal';
 import { useAuth } from '../auth/AuthContext';
 import { canAccessProject } from '../data/roles';
 
@@ -38,12 +40,13 @@ function getProjectsInPhase(phase: ProjectPhase, visibleProjects: Project[]) {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const visibleProjects = projects.filter((p) => canAccessProject(user, p.id));
+  const allProjects = useProjects();
+  const [createOpen, setCreateOpen] = useState(false);
+  const visibleProjects = allProjects.filter((p) => canAccessProject(user, p.id));
 
-  // Portfolio roll-up — all derived from existing project data (no invented figures).
   const totalGdv = visibleProjects.reduce((t, p) => t + p.estimatedValue, 0);
   const totalUnits = visibleProjects.reduce((t, p) => t + p.totalUnits, 0);
-  const health = visibleProjects.reduce(
+  const healthCounts = visibleProjects.reduce(
     (acc, p) => {
       const s = projectCommandData[p.id]?.health.status ?? 'on_track';
       acc[s] += 1;
@@ -58,28 +61,50 @@ export default function Dashboard() {
     { label: 'Total dwellings', value: totalUnits.toLocaleString('en-AU') },
   ];
 
+  const newButton = (
+    <button
+      onClick={() => setCreateOpen(true)}
+      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      New project
+    </button>
+  );
+
+  const firstName = user ? user.name.split(/\s|\(/)[0] : '';
+
   if (visibleProjects.length === 0) {
     return (
-      <AppShell
-        title={`Welcome${user ? `, ${user.name.split(/\s|\(/)[0]}` : ''}`}
-        subtitle="Your property development portfolio"
-      >
+      <AppShell title={`Welcome${firstName ? `, ${firstName}` : ''}`} subtitle="Your property development portfolio" actions={newButton}>
         <div className="surface p-12 sm:p-16 text-center">
           <div className="text-4xl mb-3">🏗️</div>
           <h3 className="text-lg font-semibold text-gray-900">No projects yet</h3>
           <p className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto">
-            This is a clean slate. Once a project is added it appears here with its
-            phases, feasibility, financials, construction and sales.
+            Create your first development to start tracking its phases, feasibility,
+            financials, construction and sales.
           </p>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="mt-5 inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Create a project
+          </button>
         </div>
+        {createOpen && <CreateProjectModal onClose={() => setCreateOpen(false)} />}
       </AppShell>
     );
   }
 
   return (
     <AppShell
-      title={`Welcome back, ${user?.name.split(/\s|\(/)[0] ?? ''}`}
+      title={`Welcome${firstName ? `, ${firstName}` : ''}`}
       subtitle="Your property development portfolio at a glance"
+      actions={newButton}
     >
       {/* Portfolio summary strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -93,13 +118,13 @@ export default function Dashboard() {
           <p className="text-xs font-medium text-gray-400">Project health</p>
           <div className="flex items-center gap-3 mt-2">
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{health.on_track}
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{healthCounts.on_track}
             </span>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-600">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />{health.at_risk}
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />{healthCounts.at_risk}
             </span>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500" />{health.critical}
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500" />{healthCounts.critical}
             </span>
           </div>
           <p className="text-[11px] text-gray-400 mt-1">On track · At risk · Critical</p>
@@ -107,9 +132,7 @@ export default function Dashboard() {
       </div>
 
       {/* Pipeline by phase */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Active across phases</h2>
-      </div>
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Active across phases</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-9">
         {PHASE_SECTIONS.map((phase) => {
           const phaseProjects = getProjectsInPhase(phase, visibleProjects);
@@ -152,6 +175,8 @@ export default function Dashboard() {
           <ProjectCard key={project.id} project={project} />
         ))}
       </div>
+
+      {createOpen && <CreateProjectModal onClose={() => setCreateOpen(false)} />}
     </AppShell>
   );
 }

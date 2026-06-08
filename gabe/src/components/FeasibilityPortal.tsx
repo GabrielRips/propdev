@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from './AppShell';
 import FeasibilityTab from './FeasibilityTab';
-import { projects } from '../data/projects';
+import { useProjects } from '../data/projectStore';
 import { feasibilityData } from '../data/feasibility-data';
 import { useAuth } from '../auth/AuthContext';
 import { canAccessProject } from '../data/roles';
@@ -15,6 +15,7 @@ function fmtShort(n: number): string {
 
 export default function FeasibilityPortal() {
   const { user } = useAuth();
+  const projects = useProjects();
   const visible = projects.filter((p) => canAccessProject(user, p.id) && feasibilityData[p.id]);
   const [activeId, setActiveId] = useState(visible[0]?.id ?? '');
   const active = visible.find((p) => p.id === activeId);

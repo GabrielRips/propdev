@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { projects, PROJECT_PHASES } from '../data/projects';
+import { PROJECT_PHASES } from '../data/projects';
+import { useProjects } from '../data/projectStore';
 import { phaseDetails } from '../data/phase-details';
 import { projectCommandData } from '../data/project-insights';
 import PhaseCard from './PhaseCard';
@@ -151,6 +152,7 @@ function ProjectEmailModal({ projectName, onClose }: { projectName: string; onCl
 
 export default function ProjectDetail() {
   const { user } = useAuth();
+  const projects = useProjects();
   const { projectId } = useParams<{ projectId: string }>();
   const project = projects.find((p) => p.id === projectId);
   const [viewMode, setViewMode] = useState<ViewMode>('phases');

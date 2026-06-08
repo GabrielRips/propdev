@@ -7,7 +7,7 @@ import {
   PackType,
   CapitalRequest,
 } from '../data/investor-data';
-import { projects } from '../data/projects';
+import { getProjects } from '../data/projectStore';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function formatAUD(amount: number): string {
@@ -38,7 +38,7 @@ const REGEN_DATE = '2026-06-06';
 const SHARE_DATE = '2026-06-07';
 
 function projectName(projectId: string): string {
-  return projects.find((p) => p.id === projectId)?.name ?? 'Unknown project';
+  return getProjects().find((p) => p.id === projectId)?.name ?? 'Unknown project';
 }
 
 // ── Static config ────────────────────────────────────────────────────────

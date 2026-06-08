@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell from './AppShell';
 import ConstructionTab from './ConstructionTab';
-import { projects } from '../data/projects';
+import { useProjects } from '../data/projectStore';
 import { useAuth } from '../auth/AuthContext';
 import { canAccessProject } from '../data/roles';
 
 export default function ConstructionPortal() {
   const { user } = useAuth();
+  const projects = useProjects();
   const visible = projects.filter((p) => canAccessProject(user, p.id) && (p.phases['Construction'] ?? 0) > 0);
   const [activeId, setActiveId] = useState(visible[0]?.id ?? '');
   const active = visible.find((p) => p.id === activeId);

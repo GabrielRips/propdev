@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { projects } from '../data/projects';
+import { useProjects } from '../data/projectStore';
 import AppShell from './AppShell';
 import { useAuth } from '../auth/AuthContext';
 import { canAccessProject } from '../data/roles';
@@ -225,6 +225,7 @@ function DecisionCard({ decision, onDismiss }: { decision: Decision; onDismiss: 
 
 export default function AgenticDashboard() {
   const { user } = useAuth();
+  const projects = useProjects();
   const visibleProjects = projects.filter((p) => canAccessProject(user, p.id));
   const [activeProjectId, setActiveProjectId] = useState(
     visibleProjects[0]?.id ?? ''

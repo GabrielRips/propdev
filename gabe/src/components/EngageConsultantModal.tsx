@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { projects } from '../data/projects';
+import { getProjects } from '../data/projectStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,8 @@ function getStageLabel(phases: Record<string, number>): string {
 }
 
 function buildBrief(projectId: string, consultantType: string): BriefFields {
-  const project = projects.find((p) => p.id === projectId) || projects[0];
+  const all = getProjects();
+  const project = all.find((p) => p.id === projectId) || all[0];
   const stage = getStageLabel(project.phases as Record<string, number>);
 
   const scopeByType: Record<string, string> = {

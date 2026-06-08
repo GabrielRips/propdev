@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { projects, PROJECT_PHASES } from '../data/projects';
+import { PROJECT_PHASES } from '../data/projects';
+import { useProjects } from '../data/projectStore';
 import { phaseDetails, TaskStatus } from '../data/phase-details';
 import AppShell from './AppShell';
 import { useAuth } from '../auth/AuthContext';
@@ -237,6 +238,7 @@ function KanbanBoard({ projectId }: { projectId: string }) {
 
 export default function Planner() {
   const { user } = useAuth();
+  const projects = useProjects();
   const visibleProjects = projects.filter((p) => canAccessProject(user, p.id));
   const [activeProjectId, setActiveProjectId] = useState(
     visibleProjects[0]?.id ?? ''

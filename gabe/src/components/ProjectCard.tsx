@@ -1,19 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Project, PROJECT_PHASES, overallCompletion } from '../data/projects';
-
-const phaseBarColors: Record<string, string> = {
-  'Site Identification': 'bg-gray-400',
-  'Feasibility': 'bg-blue-500',
-  'Financing': 'bg-indigo-500',
-  'Pre-sales': 'bg-purple-500',
-  'Land Acquisition': 'bg-pink-500',
-  'Architecture': 'bg-orange-500',
-  'Planning Permit': 'bg-yellow-500',
-  'Construction': 'bg-emerald-500',
-  'Marketing': 'bg-teal-500',
-  'Sales': 'bg-green-500',
-};
+import { projectCommandData, ProjectHealthStatus } from '../data/project-insights';
 
 const typeIcons: Record<string, string> = {
   'Townhouse Development': '🏘️',
@@ -21,10 +9,14 @@ const typeIcons: Record<string, string> = {
   'Subdivision': '🗺️',
 };
 
+const healthStyle: Record<ProjectHealthStatus, { dot: string; text: string; bg: string; label: string }> = {
+  on_track: { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50', label: 'On track' },
+  at_risk: { dot: 'bg-amber-500', text: 'text-amber-700', bg: 'bg-amber-50', label: 'At risk' },
+  critical: { dot: 'bg-red-500', text: 'text-red-700', bg: 'bg-red-50', label: 'Critical' },
+};
+
 function formatAUD(value: number): string {
-  if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
-  }
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   return `$${(value / 1_000).toFixed(0)}K`;
 }
 
@@ -34,103 +26,79 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project }: ProjectCardProps) {
   const overall = overallCompletion(project.phases);
-  const activePhases = PROJECT_PHASES
-    .filter((phase) => (project.phases[phase] ?? 0) > 1);
+  const health = projectCommandData[project.id]?.health.status ?? 'on_track';
+  const hs = healthStyle[health];
+
+  // Show the phases that are actively in progress (keeps the card scannable).
+  const inProgress = PROJECT_PHASES.filter((p) => {
+    const pct = project.phases[p] ?? 0;
+    return pct > 0 && pct < 100;
+  }).slice(0, 3);
+
+  const overallColor = overall >= 60 ? 'bg-emerald-500' : overall >= 30 ? 'bg-blue-500' : 'bg-gray-400';
 
   return (
-    <Link to={`/project/${project.id}`} className="block bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-gray-900 truncate">
-            {project.name}
-          </h3>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {project.address}, {project.suburb} {project.state}
-          </p>
+    <Link
+      to={`/project/${project.id}`}
+      className="group block surface surface-hover p-5"
+    >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-xl flex-shrink-0">
+            {typeIcons[project.type]}
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+              {project.name}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">
+              {project.suburb} {project.state} · {project.type}
+            </p>
+          </div>
         </div>
-        <span className="text-2xl ml-3" title={project.type}>
-          {typeIcons[project.type]}
+        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full flex-shrink-0 ${hs.bg} ${hs.text}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${hs.dot}`} />
+          {hs.label}
         </span>
       </div>
 
-      {/* Phase Progress Bars */}
-      <div className="space-y-2 mb-4">
-        {activePhases.map((phase) => {
-          const pct = project.phases[phase]!;
-          const done = pct === 100;
-          return (
-            <div key={phase}>
-              <div className="flex justify-between items-center text-xs mb-0.5">
-                <span className={done ? 'text-gray-400' : 'text-gray-600 font-medium'}>
-                  {phase}
-                </span>
-                <span className={done ? 'text-gray-400' : 'text-gray-500'}>
-                  {done ? 'Done' : `${pct}%`}
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-1.5">
-                <div
-                  className={`${
-                    done ? 'bg-gray-300' : phaseBarColors[phase]
-                  } h-1.5 rounded-full transition-all`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Overall progress */}
-      <div className="mb-4 pt-2 border-t border-gray-100">
-        <div className="flex justify-between text-xs text-gray-500 mb-1">
-          <span className="font-medium">Overall</span>
-          <span>{overall}%</span>
+      <div className="mb-4">
+        <div className="flex justify-between text-xs mb-1.5">
+          <span className="font-medium text-gray-500">Overall progress</span>
+          <span className="font-semibold text-gray-700">{overall}%</span>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full transition-all ${
-              overall >= 60 ? 'bg-emerald-500' : overall >= 30 ? 'bg-blue-500' : 'bg-gray-400'
-            }`}
-            style={{ width: `${overall}%` }}
-          />
+        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+          <div className={`h-2 rounded-full transition-all ${overallColor}`} style={{ width: `${overall}%` }} />
         </div>
+        {inProgress.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {inProgress.map((phase) => (
+              <span key={phase} className="text-[11px] font-medium text-gray-600 bg-gray-100 rounded-md px-2 py-0.5">
+                {phase} {project.phases[phase]}%
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-sm">
+      {/* Footer stats */}
+      <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-100 text-sm">
         <div>
-          <p className="text-gray-400 text-xs">Est. Value</p>
+          <p className="text-gray-400 text-[11px]">Est. value</p>
           <p className="font-semibold text-gray-800">{formatAUD(project.estimatedValue)}</p>
         </div>
         <div>
-          <p className="text-gray-400 text-xs">
-            {project.type === 'Subdivision' ? 'Lots' : 'Units'}
-          </p>
+          <p className="text-gray-400 text-[11px]">{project.type === 'Subdivision' ? 'Lots' : 'Units'}</p>
           <p className="font-semibold text-gray-800">{project.totalUnits}</p>
         </div>
         <div>
-          <p className="text-gray-400 text-xs">Est. Completion</p>
+          <p className="text-gray-400 text-[11px]">Completion</p>
           <p className="font-semibold text-gray-800">
-            {new Date(project.estimatedCompletion).toLocaleDateString('en-AU', {
-              month: 'short',
-              year: 'numeric',
-            })}
-          </p>
-        </div>
-        <div>
-          <p className="text-gray-400 text-xs">Recent Emails</p>
-          <p className="font-semibold text-gray-800 flex items-center gap-1">
-            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            {project.recentEmails}
+            {new Date(project.estimatedCompletion).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}
           </p>
         </div>
       </div>
-
-      <p className="text-xs text-gray-400 mt-4 line-clamp-2">
-        {project.description}
-      </p>
     </Link>
   );
 }

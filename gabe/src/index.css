@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  /* Make every interactive control feel clickable */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Calm, consistent keyboard focus everywhere (suppressed on mouse click) */
+  :focus-visible {
+    outline: none;
+    @apply ring-2 ring-blue-500/60 ring-offset-1 ring-offset-white rounded-md;
+  }
+
+  ::selection {
+    @apply bg-blue-600/15;
+  }
+
+  /* Slim, unobtrusive scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(203 213 225);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(148 163 184);
+  }
+}
+
+@layer components {
+  /* Shared surface for cards — soft, modern, consistent across the app */
+  .surface {
+    @apply bg-white rounded-2xl border border-gray-200/80 shadow-card;
+  }
+  .surface-hover {
+    @apply transition-all duration-200 hover:shadow-card-hover hover:border-gray-300;
+  }
+}

@@ -66,21 +66,20 @@ function LoginScreen() {
         </form>
 
         <div className="mt-6 pt-4 border-t border-gray-100">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Demo roles (click to fill)</p>
-          <ul className="space-y-1">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Demo roles — tap to fill</p>
+          <div className="space-y-1">
             {USERS.map((u) => (
-              <li key={u.username} className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">{u.roleLabel}</span>
-                <button
-                  type="button"
-                  onClick={() => { setUsername(u.username); setPassword(u.password); }}
-                  className="font-mono text-gray-400 hover:text-blue-600"
-                >
-                  {u.username} / {u.password}
-                </button>
-              </li>
+              <button
+                key={u.username}
+                type="button"
+                onClick={() => { setUsername(u.username); setPassword(u.password); }}
+                className="w-full flex items-center justify-between text-xs px-2.5 py-2 rounded-lg border border-transparent hover:bg-gray-50 hover:border-gray-200 transition-colors"
+              >
+                <span className="font-medium text-gray-700">{u.roleLabel}</span>
+                <span className="font-mono text-gray-400">{u.username} / {u.password}</span>
+              </button>
             ))}
-          </ul>
+          </div>
         </div>
       </section>
     </main>

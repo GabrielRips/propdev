@@ -15,6 +15,16 @@ import { canAccessProject } from '../data/roles';
 
 type ViewMode = 'phases' | 'advanced';
 
+const typeIcon: Record<string, string> = {
+  'Townhouse Development': '🏘️',
+  'Residential Tower': '🏢',
+  'Subdivision': '🗺️',
+};
+
+function fmtAUD(v: number): string {
+  return v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` : `$${(v / 1_000).toFixed(0)}K`;
+}
+
 // ─── Project Email Modal ───────────────────────────────────────────────────────
 
 function generateEmailBody(projectName: string): string {
@@ -187,32 +197,53 @@ export default function ProjectDetail() {
   return (
     <AppShell>
         {/* Breadcrumb */}
-        <nav className="mb-6 text-sm">
-          <Link to="/" className="text-blue-600 hover:underline">
-            Dashboard
+        <nav className="mb-5">
+          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            All projects
           </Link>
-          <span className="mx-2 text-gray-400">/</span>
-          <span className="text-gray-600">{project.name}</span>
         </nav>
 
         {/* Project Header — Two Panels */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           {/* Left Panel — Project Identity */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-2xl font-bold text-gray-900">{project.name}</h2>
-            <p className="text-gray-500 mt-1">
-              {project.address}, {project.suburb} {project.state}
-            </p>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-sm font-medium text-gray-800">{project.name} Pty Ltd</p>
-              {commandData && (
-                <p className="text-xs text-gray-400 mt-0.5">ABN {commandData.abn}</p>
-              )}
+          <div className="surface p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-2xl flex-shrink-0">
+                {typeIcon[project.type]}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold text-gray-900 leading-tight tracking-tight">{project.name}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {project.address}, {project.suburb} {project.state}
+                </p>
+              </div>
             </div>
+            <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t border-gray-100">
+              <div>
+                <p className="text-[11px] text-gray-400">Est. value</p>
+                <p className="text-sm font-semibold text-gray-800">{fmtAUD(project.estimatedValue)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-gray-400">{project.type === 'Subdivision' ? 'Lots' : 'Units'}</p>
+                <p className="text-sm font-semibold text-gray-800">{project.totalUnits}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-gray-400">Completion</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {new Date(project.estimatedCompletion).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-4">
+              {project.name} Pty Ltd{commandData ? ` · ABN ${commandData.abn}` : ''}
+            </p>
           </div>
 
           {/* Right Panel — Command Center */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="surface p-6">
             {commandData && (
               <div className="flex flex-col gap-4">
                 {/* Status Traffic Light */}
@@ -301,7 +332,10 @@ export default function ProjectDetail() {
         </div>
 
         {/* View Toggle */}
-        <div className="flex items-center justify-end mb-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+            {viewMode === 'phases' ? 'Phase progress' : 'Project workspace'}
+          </h2>
           <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('phases')}

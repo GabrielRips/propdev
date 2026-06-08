@@ -1,36 +1,31 @@
-// Generic, browser-persisted collection store (no backend).
-// Every module gets a consistent way to add / edit / remove records that
-// persist to localStorage and sync across components via an external store.
-import { useSyncExternalStore, useMemo } from 'react';
+// Generic, backend-persisted collection store.
+// Keyed by `propdev:<projectId>:<name>`, backed by the REST collections API,
+// with an in-memory cache + optimistic updates so the UI stays snappy.
+import { useSyncExternalStore, useEffect, useMemo } from 'react';
+import { api } from './api';
 
 export interface HasId {
   id: string;
 }
 
-const memory: Record<string, HasId[]> = {};
+const cache: Record<string, HasId[]> = {};
+const loaded: Record<string, boolean> = {};
 const listeners: Record<string, Set<() => void>> = {};
 
-function load<T extends HasId>(key: string): T[] {
-  try {
-    const raw = localStorage.getItem(key);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
+function parseKey(key: string): { projectId: string; name: string } | null {
+  const parts = key.split(':'); // ['propdev', projectId, name...]
+  if (parts.length < 3) return null;
+  return { projectId: parts[1], name: parts.slice(2).join(':') };
+}
+
+function endpoint(key: string): string | null {
+  const p = parseKey(key);
+  if (!p || !p.projectId) return null;
+  return `/projects/${p.projectId}/collections/${p.name}`;
 }
 
 function snapshot<T extends HasId>(key: string): T[] {
-  if (!(key in memory)) memory[key] = load<T>(key);
-  return memory[key] as T[];
-}
-
-function persist(key: string) {
-  try {
-    localStorage.setItem(key, JSON.stringify(memory[key]));
-  } catch {
-    /* ignore quota errors */
-  }
+  return (cache[key] ?? []) as T[];
 }
 
 function emit(key: string) {
@@ -46,6 +41,18 @@ function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+async function fetchKey(key: string) {
+  const url = endpoint(key);
+  if (!url) return;
+  try {
+    cache[key] = await api.get<HasId[]>(url);
+    loaded[key] = true;
+    emit(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface Collection<T extends HasId> {
   items: T[];
   add: (item: Omit<T, 'id'> & { id?: string }) => T;
@@ -54,20 +61,6 @@ export interface Collection<T extends HasId> {
   set: (items: T[]) => void;
 }
 
-/** Imperative access (for non-component code). */
-export function getCollection<T extends HasId>(key: string): T[] {
-  return snapshot<T>(key);
-}
-
-export function addToCollection<T extends HasId>(key: string, item: Omit<T, 'id'> & { id?: string }): T {
-  const record = { id: item.id ?? newId(), ...item } as T;
-  memory[key] = [record, ...snapshot<T>(key)];
-  persist(key);
-  emit(key);
-  return record;
-}
-
-/** React hook — reactive, persisted collection keyed by string. */
 export function useCollection<T extends HasId>(key: string): Collection<T> {
   const items = useSyncExternalStore(
     (l) => subscribeKey(key, l),
@@ -75,26 +68,35 @@ export function useCollection<T extends HasId>(key: string): Collection<T> {
     () => snapshot<T>(key)
   );
 
-  return useMemo(
-    () => ({
+  useEffect(() => {
+    if (!loaded[key]) fetchKey(key);
+  }, [key]);
+
+  return useMemo(() => {
+    const url = endpoint(key);
+    return {
       items,
-      add: (item) => addToCollection<T>(key, item),
-      update: (id, patch) => {
-        memory[key] = snapshot<T>(key).map((r) => (r.id === id ? { ...r, ...patch } : r));
-        persist(key);
+      add: (item) => {
+        const record = { id: item.id ?? newId(), ...item } as T;
+        cache[key] = [record, ...snapshot<T>(key)];
         emit(key);
+        if (url) api.post(url, record).catch(() => fetchKey(key));
+        return record;
+      },
+      update: (id, patch) => {
+        cache[key] = snapshot<T>(key).map((r) => (r.id === id ? { ...r, ...patch } : r));
+        emit(key);
+        if (url) api.put(`${url}/${id}`, patch).catch(() => fetchKey(key));
       },
       remove: (id) => {
-        memory[key] = snapshot<T>(key).filter((r) => r.id !== id);
-        persist(key);
+        cache[key] = snapshot<T>(key).filter((r) => r.id !== id);
         emit(key);
+        if (url) api.del(`${url}/${id}`).catch(() => fetchKey(key));
       },
       set: (next) => {
-        memory[key] = next;
-        persist(key);
+        cache[key] = next;
         emit(key);
       },
-    }),
-    [key, items]
-  );
+    };
+  }, [key, items]);
 }

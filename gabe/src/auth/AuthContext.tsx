@@ -1,24 +1,26 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { GabeUser, authenticate } from '../data/roles';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { GabeUser } from '../data/roles';
+import { loginRequest, setToken, clearToken, getToken } from '../data/api';
+import { refreshProjects } from '../data/projectStore';
 
-const STORAGE_KEY = 'gabe-user';
+const USER_KEY = 'propdev-user';
 
 interface AuthContextValue {
   user: GabeUser | null;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
-  login: () => false,
+  login: async () => false,
   logout: () => {},
 });
 
 function loadUser(): GabeUser | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as GabeUser) : null;
+    const raw = localStorage.getItem(USER_KEY);
+    return raw && getToken() ? (JSON.parse(raw) as GabeUser) : null;
   } catch {
     return null;
   }
@@ -27,19 +29,26 @@ function loadUser(): GabeUser | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<GabeUser | null>(loadUser);
 
-  const login = (username: string, password: string) => {
-    const found = authenticate(username, password);
-    if (found) {
-      setUser(found);
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(found));
-      return true;
-    }
-    return false;
+  // On load with an existing token, pull projects from the server.
+  useEffect(() => {
+    if (user && getToken()) refreshProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const login = async (username: string, password: string) => {
+    const result = await loginRequest(username, password);
+    if (!result) return false;
+    setToken(result.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    setUser(result.user as GabeUser);
+    refreshProjects();
+    return true;
   };
 
   const logout = () => {
     setUser(null);
-    sessionStorage.removeItem(STORAGE_KEY);
+    clearToken();
+    localStorage.removeItem(USER_KEY);
   };
 
   return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;

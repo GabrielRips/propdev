@@ -18,11 +18,15 @@ function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!login(username, password)) {
-      setError('Invalid username or password.');
-    }
+    setBusy(true);
+    setError('');
+    const ok = await login(username, password);
+    setBusy(false);
+    if (!ok) setError('Invalid username or password.');
   };
 
   return (
@@ -59,9 +63,10 @@ function LoginScreen() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
-            className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+            disabled={busy}
+            className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60"
           >
-            Sign in
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 

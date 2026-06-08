@@ -34,23 +34,30 @@ export default function CreateProjectModal({ onClose }: { onClose: () => void })
 
   const unitsLabel = type === 'Subdivision' ? 'Number of lots' : 'Number of units';
 
-  function handleSubmit(e: FormEvent) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    const project = addProject({
-      name,
-      type,
-      address,
-      suburb,
-      state,
-      totalUnits: Number(units) || 0,
-      estimatedValue: Number(value) || 0,
-      startDate: startDate || today(),
-      estimatedCompletion: completion || '',
-      description,
-    });
-    onClose();
-    navigate(`/project/${project.id}`);
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const project = await addProject({
+        name,
+        type,
+        address,
+        suburb,
+        state,
+        totalUnits: Number(units) || 0,
+        estimatedValue: Number(value) || 0,
+        startDate: startDate || today(),
+        estimatedCompletion: completion || '',
+        description,
+      });
+      onClose();
+      navigate(`/project/${project.id}`);
+    } catch {
+      setSaving(false);
+    }
   }
 
   return (
@@ -149,13 +156,13 @@ export default function CreateProjectModal({ onClose }: { onClose: () => void })
           </button>
           <button
             type="submit"
-            disabled={!name.trim()}
+            disabled={!name.trim() || saving}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
-            Create project
+            {saving ? 'Creating…' : 'Create project'}
           </button>
         </div>
       </form>

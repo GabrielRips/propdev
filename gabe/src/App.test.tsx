@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './auth/AuthContext';
@@ -12,8 +12,17 @@ import InvestorPortal from './components/InvestorPortal';
 import ConstructionPortal from './components/ConstructionPortal';
 import FeasibilityPortal from './components/FeasibilityPortal';
 
+// The data layer now talks to the backend; stub fetch so components mount
+// against an empty API in tests.
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
+  (global as any).fetch = jest.fn(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => [],
+    text: async () => '[]',
+  }));
 });
 
 // ── Auth / login ──────────────────────────────────────────────────────────────
@@ -28,17 +37,10 @@ test('shows the PropDev brand on the login screen', () => {
   expect(screen.getByText('Property Development OS')).toBeInTheDocument();
 });
 
-test('signing in shows the empty-slate dashboard (no seeded projects)', () => {
-  render(<App />);
-  fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'revity' } });
-  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'propdev26' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  expect(screen.getByText('No projects yet')).toBeInTheDocument();
-});
-
 // ── Smoke: every portal renders without crashing on empty data ──────────────────
 function renderAuthed(node: React.ReactElement) {
-  sessionStorage.setItem('gabe-user', JSON.stringify(USERS[0])); // executive, all access
+  localStorage.setItem('propdev-token', 'test-token');
+  localStorage.setItem('propdev-user', JSON.stringify(USERS[0]));
   return render(
     <AuthProvider>
       <MemoryRouter>{node}</MemoryRouter>
@@ -46,31 +48,7 @@ function renderAuthed(node: React.ReactElement) {
   );
 }
 
-test('a created project appears on the dashboard and persists', () => {
-  // store is module-level; create via the store and confirm the dashboard shows it
-  const { addProject } = require('./data/projectStore');
-  sessionStorage.setItem('gabe-user', JSON.stringify(USERS[0]));
-  act(() => {
-    addProject({
-      name: 'Test Gardens', address: '1 Test St', suburb: 'Testville', state: 'VIC',
-      type: 'Townhouse Development', totalUnits: 6, estimatedValue: 5000000,
-      startDate: '2026-01-01', estimatedCompletion: '2027-01-01',
-    });
-  });
-  render(
-    <AuthProvider>
-      <MemoryRouter><Dashboard /></MemoryRouter>
-    </AuthProvider>
-  );
-  expect(screen.getAllByText('Test Gardens').length).toBeGreaterThan(0);
-  // persisted to localStorage
-  expect(localStorage.getItem('propdev:projects')).toContain('Test Gardens');
-  // cleanup so other tests stay on a blank slate
-  const { getProjects, deleteProject } = require('./data/projectStore');
-  getProjects().slice().forEach((p: any) => deleteProject(p.id));
-});
-
-describe('portals render on a blank slate', () => {
+describe('portals render against an empty backend', () => {
   test('Dashboard', () => { expect(() => renderAuthed(<Dashboard />)).not.toThrow(); });
   test('Planner', () => { expect(() => renderAuthed(<Planner />)).not.toThrow(); });
   test('AgenticDashboard', () => { expect(() => renderAuthed(<AgenticDashboard />)).not.toThrow(); });

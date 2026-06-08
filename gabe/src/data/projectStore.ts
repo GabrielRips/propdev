@@ -1,31 +1,13 @@
-// Browser-persisted project store (no backend).
-// Projects created in-app are saved to localStorage and shared across the UI
-// via a React external store so every screen updates when one is added/removed.
-import { useSyncExternalStore } from 'react';
+// Project store backed by the backend API, exposed through the same
+// useProjects()/addProject()/updateProject()/deleteProject() interface as before.
+import { useSyncExternalStore, useEffect } from 'react';
 import { Project, ProjectPhase, ProjectType } from './projects';
+import { api } from './api';
 
-const STORAGE_KEY = 'propdev:projects';
-
-let projects: Project[] = load();
+let projects: Project[] = [];
+let loaded = false;
+let loading = false;
 const listeners = new Set<() => void>();
-
-function load(): Project[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Project[]) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function persist() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  } catch {
-    /* ignore quota / private-mode errors */
-  }
-}
 
 function emit() {
   listeners.forEach((l) => l());
@@ -44,6 +26,20 @@ export function getProject(id: string | undefined): Project | undefined {
   return projects.find((p) => p.id === id);
 }
 
+export async function refreshProjects(): Promise<void> {
+  if (loading) return;
+  loading = true;
+  try {
+    projects = await api.get<Project[]>('/projects');
+    loaded = true;
+    emit();
+  } catch {
+    /* not authenticated yet, or offline */
+  } finally {
+    loading = false;
+  }
+}
+
 export interface NewProjectInput {
   name: string;
   address: string;
@@ -58,9 +54,8 @@ export interface NewProjectInput {
   phases?: Partial<Record<ProjectPhase, number>>;
 }
 
-export function addProject(input: NewProjectInput): Project {
-  const project: Project = {
-    id: `proj-${Date.now().toString(36)}`,
+export async function addProject(input: NewProjectInput): Promise<Project> {
+  const created = await api.post<Project>('/projects', {
     name: input.name.trim(),
     address: input.address.trim(),
     suburb: input.suburb.trim(),
@@ -73,25 +68,37 @@ export function addProject(input: NewProjectInput): Project {
     estimatedCompletion: input.estimatedCompletion,
     recentEmails: 0,
     description: input.description?.trim() ?? '',
-  };
-  projects = [project, ...projects];
-  persist();
+  });
+  projects = [created, ...projects];
   emit();
-  return project;
+  return created;
 }
 
-export function updateProject(id: string, patch: Partial<Project>) {
+export async function updateProject(id: string, patch: Partial<Project>): Promise<void> {
+  // optimistic
   projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p));
-  persist();
   emit();
+  try {
+    await api.put<Project>(`/projects/${id}`, patch);
+  } catch {
+    refreshProjects();
+  }
 }
 
-export function deleteProject(id: string) {
+export async function deleteProject(id: string): Promise<void> {
   projects = projects.filter((p) => p.id !== id);
-  persist();
   emit();
+  try {
+    await api.del(`/projects/${id}`);
+  } catch {
+    refreshProjects();
+  }
 }
 
 export function useProjects(): Project[] {
-  return useSyncExternalStore(subscribe, getProjects, getProjects);
+  const value = useSyncExternalStore(subscribe, getProjects, getProjects);
+  useEffect(() => {
+    if (!loaded) refreshProjects();
+  }, []);
+  return value;
 }

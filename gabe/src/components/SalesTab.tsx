@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { salesData, getSalesSummary, SalesLot, LotStatus, ProjectSales } from '../data/sales-data';
+import { getSalesSummary, SalesLot, LotStatus } from '../data/sales-data';
+import { useCollection } from '../data/useCollection';
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 function formatAUD(n: number): string {
@@ -101,6 +102,7 @@ function LotDetailModal({
   onClose,
   onReserve,
   onConvert,
+  onDelete,
 }: {
   lot: SalesLot;
   agency: string;
@@ -108,6 +110,7 @@ function LotDetailModal({
   onClose: () => void;
   onReserve: (id: string) => void;
   onConvert: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -176,7 +179,7 @@ function LotDetailModal({
             </div>
             <div>
               <p className="text-xs text-gray-400 mb-1">Agent</p>
-              <p className="text-sm text-gray-900">{lot.agent ?? agentLead}</p>
+              <p className="text-sm text-gray-900">{lot.agent || agentLead || '—'}</p>
             </div>
           </div>
 
@@ -215,14 +218,28 @@ function LotDetailModal({
           )}
 
           {/* Agency footer */}
-          <div className="border-t border-gray-100 pt-4 text-xs text-gray-400">
-            Listed by {agency} · Lead agent {agentLead}
-          </div>
+          {(agency || agentLead) && (
+            <div className="border-t border-gray-100 pt-4 text-xs text-gray-400">
+              {agency && `Listed by ${agency}`}
+              {agency && agentLead && ' · '}
+              {agentLead && `Lead agent ${agentLead}`}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
-        {(lot.status === 'available' || lot.status === 'reserved') && (
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-2">
+          <button
+            onClick={() => {
+              if (window.confirm(`Delete ${lot.lotNumber}? This cannot be undone.`)) {
+                onDelete(lot.id);
+              }
+            }}
+            className="px-4 py-2 text-sm font-medium bg-white text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
+          >
+            Delete
+          </button>
+          <div className="flex items-center gap-2">
             {lot.status === 'available' && (
               <button
                 onClick={() => onReserve(lot.id)}
@@ -240,7 +257,168 @@ function LotDetailModal({
               </button>
             )}
           </div>
-        )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Add lot modal ────────────────────────────────────────────────────────────
+const STATUS_OPTIONS: LotStatus[] = ['available', 'reserved', 'under_contract', 'settled'];
+
+function AddLotModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (lot: Omit<SalesLot, 'id'>) => void;
+}) {
+  const [lotNumber, setLotNumber] = useState('');
+  const [beds, setBeds] = useState('3');
+  const [baths, setBaths] = useState('2');
+  const [cars, setCars] = useState('1');
+  const [internalArea, setInternalArea] = useState('');
+  const [listPrice, setListPrice] = useState('');
+  const [status, setStatus] = useState<LotStatus>('available');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!lotNumber.trim()) {
+      setError('Lot/unit number is required.');
+      return;
+    }
+    onAdd({
+      lotNumber: lotNumber.trim(),
+      beds: Number(beds) || 0,
+      baths: Number(baths) || 0,
+      cars: Number(cars) || 0,
+      internalArea: Number(internalArea) || 0,
+      listPrice: Number(listPrice) || 0,
+      status,
+    });
+    onClose();
+  }
+
+  const inputClass =
+    'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900">Add lot / unit</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              Lot / unit number <span className="text-red-500">*</span>
+            </label>
+            <input
+              autoFocus
+              value={lotNumber}
+              onChange={(e) => {
+                setLotNumber(e.target.value);
+                if (error) setError('');
+              }}
+              placeholder="e.g. Unit 4, Lot 12"
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Beds</label>
+              <input type="number" min={0} value={beds} onChange={(e) => setBeds(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Baths</label>
+              <input type="number" min={0} value={baths} onChange={(e) => setBaths(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Cars</label>
+              <input type="number" min={0} value={cars} onChange={(e) => setCars(e.target.value)} className={inputClass} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Internal area (m²)</label>
+              <input
+                type="number"
+                min={0}
+                value={internalArea}
+                onChange={(e) => setInternalArea(e.target.value)}
+                placeholder="e.g. 120"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">List price (AUD)</label>
+              <input
+                type="number"
+                min={0}
+                value={listPrice}
+                onChange={(e) => setListPrice(e.target.value)}
+                placeholder="e.g. 850000"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as LotStatus)}
+              className={inputClass}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_META[s].label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              Add lot
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -248,61 +426,81 @@ function LotDetailModal({
 
 // ── Main component ───────────────────────────────────────────────────────────
 export default function SalesTab({ projectId }: { projectId: string }) {
-  const project: ProjectSales | undefined = salesData[projectId];
+  const lots = useCollection<SalesLot>(`propdev:${projectId}:sales-lots`);
 
-  const [lots, setLots] = useState<SalesLot[]>(project?.lots ?? []);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
-  // Recompute summary from local lots (not the static import) so UI changes reflect.
+  const items = lots.items;
+
+  // Recompute summary from local items so UI changes reflect immediately.
   const summary = useMemo(
-    () => getSalesSummary(project ? { ...project, lots } : undefined),
-    [project, lots]
+    () => getSalesSummary({ agency: '', agentLead: '', lots: items }),
+    [items]
   );
 
-  if (!project) {
+  const agency = '';
+  const agentLead = '';
+
+  function reserve(id: string) {
+    lots.update(id, {
+      status: 'reserved',
+      reservedDate: new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  function convert(id: string) {
+    const lot = items.find((l) => l.id === id);
+    if (!lot) return;
+    lots.update(id, {
+      status: 'under_contract',
+      contractDate: new Date().toISOString().slice(0, 10),
+      depositPaid: lot.depositPaid ?? Math.round((lot.salePrice ?? lot.listPrice) * 0.1),
+      salePrice: lot.salePrice ?? lot.listPrice,
+    });
+  }
+
+  function deleteLot(id: string) {
+    lots.remove(id);
+    setSelectedId((cur) => (cur === id ? null : cur));
+  }
+
+  if (items.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-          <p className="text-gray-400 text-sm">No sales register for this project yet</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Sales register</h2>
+          </div>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="px-4 py-2 text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            + Add lot
+          </button>
         </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <p className="text-gray-500 text-sm">No lots yet — add your first lot/unit</p>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="mt-4 px-4 py-2 text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            + Add lot
+          </button>
+        </div>
+
+        {addOpen && <AddLotModal onClose={() => setAddOpen(false)} onAdd={(lot) => lots.add(lot)} />}
       </div>
     );
   }
 
-  const { agency, agentLead } = project;
-
-  function reserve(id: string) {
-    setLots((prev) =>
-      prev.map((l) =>
-        l.id === id
-          ? { ...l, status: 'reserved', reservedDate: new Date().toISOString().slice(0, 10) }
-          : l
-      )
-    );
-  }
-
-  function convert(id: string) {
-    setLots((prev) =>
-      prev.map((l) =>
-        l.id === id
-          ? {
-              ...l,
-              status: 'under_contract',
-              contractDate: new Date().toISOString().slice(0, 10),
-              depositPaid: l.depositPaid ?? Math.round((l.salePrice ?? l.listPrice) * 0.1),
-              salePrice: l.salePrice ?? l.listPrice,
-            }
-          : l
-      )
-    );
-  }
-
-  const filtered = filter === 'all' ? lots : lots.filter((l) => l.status === filter);
-  const selected = lots.find((l) => l.id === selectedId) ?? null;
+  const filtered = filter === 'all' ? items : items.filter((l) => l.status === filter);
+  const selected = items.find((l) => l.id === selectedId) ?? null;
 
   const filterPills: { key: FilterKey; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: lots.length },
+    { key: 'all', label: 'All', count: items.length },
     { key: 'available', label: 'Available', count: summary.available },
     { key: 'reserved', label: 'Reserved', count: summary.reserved },
     { key: 'under_contract', label: 'Under contract', count: summary.underContract },
@@ -325,9 +523,15 @@ export default function SalesTab({ projectId }: { projectId: string }) {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Sales register</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            {agency} · Lead agent {agentLead}
+            {summary.totalLots} lots · {summary.presalePct}% pre-sold
           </p>
         </div>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="px-4 py-2 text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          + Add lot
+        </button>
       </div>
 
       {/* KPI cards */}
@@ -481,8 +685,12 @@ export default function SalesTab({ projectId }: { projectId: string }) {
           onClose={() => setSelectedId(null)}
           onReserve={reserve}
           onConvert={convert}
+          onDelete={deleteLot}
         />
       )}
+
+      {/* Add lot modal */}
+      {addOpen && <AddLotModal onClose={() => setAddOpen(false)} onAdd={(lot) => lots.add(lot)} />}
     </div>
   );
 }

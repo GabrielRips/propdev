@@ -9,6 +9,7 @@ import AdvancedView from './AdvancedView';
 import NoteModal from './NoteModal';
 import VoiceModeModal from './VoiceModeModal';
 import SoftPhoneModal from './SoftPhoneModal';
+import PhasesEditorModal from './PhasesEditorModal';
 import { contactsData } from '../data/contacts-data';
 import AppShell from './AppShell';
 import { useAuth } from '../auth/AuthContext';
@@ -160,6 +161,7 @@ export default function ProjectDetail() {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [voiceModeOpen, setVoiceModeOpen] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
+  const [phasesOpen, setPhasesOpen] = useState(false);
   const projectContacts = contactsData[projectId ?? ''] ?? [];
 
   if (!project) {
@@ -338,7 +340,19 @@ export default function ProjectDetail() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             {viewMode === 'phases' ? 'Phase progress' : 'Project workspace'}
           </h2>
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-2">
+            {viewMode === 'phases' && (
+              <button
+                onClick={() => setPhasesOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+                Edit phases
+              </button>
+            )}
+            <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('phases')}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
@@ -359,25 +373,44 @@ export default function ProjectDetail() {
             >
               Advanced
             </button>
+            </div>
           </div>
         </div>
 
         {/* Content */}
         {viewMode === 'phases' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {activePhases.map((phase) => (
-              <PhaseCard
-                key={phase}
-                projectId={project.id}
-                phase={phase}
-                progress={project.phases[phase] ?? 0}
-                detail={projectPhaseDetails[phase]}
-              />
-            ))}
-          </div>
+          activePhases.length === 0 ? (
+            <div className="surface p-12 text-center">
+              <div className="text-3xl mb-2">📊</div>
+              <h3 className="text-base font-semibold text-gray-900">No phases set yet</h3>
+              <p className="text-sm text-gray-500 mt-1">Set how far along each phase is to start tracking progress.</p>
+              <button
+                onClick={() => setPhasesOpen(true)}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Edit phases
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {activePhases.map((phase) => (
+                <PhaseCard
+                  key={phase}
+                  projectId={project.id}
+                  phase={phase}
+                  progress={project.phases[phase] ?? 0}
+                  detail={projectPhaseDetails[phase]}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <AdvancedView projectId={project.id} project={project} />
         )}
+
+      {phasesOpen && (
+        <PhasesEditorModal project={project} onClose={() => setPhasesOpen(false)} />
+      )}
 
       {noteModalOpen && (
         <NoteModal

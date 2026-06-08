@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Project } from '../data/projects';
 import WipTab from './WipTab';
-import PlansTab from './PlansTab';
+import FilesPanel from './FilesPanel';
 import FinancialTab from './FinancialTab';
 import FeasibilityTab from './FeasibilityTab';
 import ContactsTab from './ContactsTab';
@@ -32,7 +32,7 @@ const GROUPS: TabGroup[] = [
     heading: 'Workspace',
     tabs: [
       { id: 'wip', label: 'Work in progress', icon: '⚡' },
-      { id: 'plans', label: 'Plans & files', icon: '📐' },
+      { id: 'plans', label: 'Files & plans', icon: '📐' },
       { id: 'contacts', label: 'Contacts', icon: '👥' },
     ],
   },
@@ -126,7 +126,7 @@ export default function AdvancedView({ projectId }: AdvancedViewProps) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         {activeTab === 'wip' && <WipTab projectId={projectId} />}
-        {activeTab === 'plans' && <PlansTab projectId={projectId} />}
+        {activeTab === 'plans' && <FilesPanel projectId={projectId} />}
         {activeTab === 'feasibility' && <FeasibilityTab projectId={projectId} />}
         {activeTab === 'financial' && <FinancialTab projectId={projectId} />}
         {activeTab === 'contacts' && <ContactsTab projectId={projectId} />}

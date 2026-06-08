@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { contactsData, Contact } from '../data/contacts-data';
+import React, { useEffect, useState } from 'react';
+import { Contact } from '../data/contacts-data';
+import { useCollection } from '../data/useCollection';
 import SoftPhoneModal from './SoftPhoneModal';
 
 // Australian mobiles: +61 4xx ... or 04xx ...
@@ -253,6 +254,138 @@ function ContactSmsModal({ contact, onClose }: { contact: Contact; onClose: () =
   );
 }
 
+// ─── Add Contact Modal ────────────────────────────────────────────────────────
+
+function AddContactModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (contact: Omit<Contact, 'id'>) => void;
+}) {
+  const [name, setName] = useState('');
+  const [organisation, setOrganisation] = useState('');
+  const [role, setRole] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSubmit({
+      name: name.trim(),
+      organisation: organisation.trim(),
+      role: role.trim() || undefined,
+      phone: phone.trim(),
+      email: email.trim(),
+    });
+    onClose();
+  }
+
+  const inputClass =
+    'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">Add contact</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="px-6 py-4 space-y-4">
+            <div>
+              <label className="text-xs font-medium text-gray-400 block mb-1">
+                Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Jane Smith"
+                className={inputClass}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-400 block mb-1">Organisation</label>
+              <input
+                type="text"
+                value={organisation}
+                onChange={(e) => setOrganisation(e.target.value)}
+                placeholder="Acme Builders"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-400 block mb-1">Role</label>
+              <input
+                type="text"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Site Manager"
+                className={inputClass}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-400 block mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="04xx xxx xxx"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-400 block mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jane@acme.com"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="px-6 pb-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim()}
+              className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Add contact
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Tab ─────────────────────────────────────────────────────────────────
 
 interface ContactsTabProps {
@@ -260,31 +393,57 @@ interface ContactsTabProps {
 }
 
 export default function ContactsTab({ projectId }: ContactsTabProps) {
-  const contacts = contactsData[projectId] ?? [];
+  const contacts = useCollection<Contact>(`propdev:${projectId}:contacts`);
   const [emailContact, setEmailContact] = useState<Contact | null>(null);
   const [smsContact, setSmsContact] = useState<Contact | null>(null);
   const [callContact, setCallContact] = useState<Contact | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
-  if (contacts.length === 0) {
+  const addButton = (
+    <button
+      onClick={() => setShowAdd(true)}
+      className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Add contact
+    </button>
+  );
+
+  if (contacts.items.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-        <p className="text-gray-400 text-sm">No contacts yet</p>
-      </div>
+      <>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+            </svg>
+          </div>
+          <p className="text-sm font-medium text-gray-700">No contacts yet</p>
+          <p className="text-xs text-gray-400 mt-1 mb-5">Add your first contact to get started.</p>
+          {addButton}
+        </div>
+        {showAdd && (
+          <AddContactModal onClose={() => setShowAdd(false)} onSubmit={(c) => contacts.add(c)} />
+        )}
+      </>
     );
   }
 
   return (
     <>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-900">
             Contacts
-            <span className="ml-2 text-xs font-normal text-gray-400">{contacts.length}</span>
+            <span className="ml-2 text-xs font-normal text-gray-400">{contacts.items.length}</span>
           </h3>
+          {addButton}
         </div>
         <ul className="divide-y divide-gray-100">
-          {contacts.map((contact) => (
-            <li key={contact.id} className="px-5 py-4 flex items-center gap-4">
+          {contacts.items.map((contact) => (
+            <li key={contact.id} className="group px-5 py-4 flex items-center gap-4">
               {/* Avatar */}
               <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-semibold text-gray-500">
@@ -336,6 +495,16 @@ export default function ContactsTab({ projectId }: ContactsTabProps) {
                   </svg>
                   Email
                 </button>
+                <button
+                  onClick={() => contacts.remove(contact.id)}
+                  aria-label={`Delete ${contact.name}`}
+                  title="Delete contact"
+                  className="inline-flex items-center justify-center w-7 h-7 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             </li>
           ))}
@@ -351,9 +520,12 @@ export default function ContactsTab({ projectId }: ContactsTabProps) {
       {callContact && (
         <SoftPhoneModal
           contact={callContact}
-          allContacts={contacts}
+          allContacts={contacts.items}
           onClose={() => setCallContact(null)}
         />
+      )}
+      {showAdd && (
+        <AddContactModal onClose={() => setShowAdd(false)} onSubmit={(c) => contacts.add(c)} />
       )}
     </>
   );

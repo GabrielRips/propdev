@@ -80,6 +80,12 @@ export function addProject(input: NewProjectInput): Project {
   return project;
 }
 
+export function updateProject(id: string, patch: Partial<Project>) {
+  projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p));
+  persist();
+  emit();
+}
+
 export function deleteProject(id: string) {
   projects = projects.filter((p) => p.id !== id);
   persist();
